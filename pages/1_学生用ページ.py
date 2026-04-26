@@ -1,53 +1,55 @@
-# 1_学生用ページ.py
 import streamlit as st
 import pandas as pd
 import datetime
-import os
 
 st.title("学生用：出席入力ページ")
 
-# 名簿CSVの読み込み（UTF-8 → cp932 の順で試す）
-@st.cache_data
-def load_data():
-    file = "meibo_1.csv"
-
-    # ① UTF-8 で読み込みを試す
+# 名簿読み込み
+try:
+    meibo = pd.read_csv("meibo_1.csv", encoding="utf-8")
+except:
     try:
-        df = pd.read_csv(file, dtype={"id": str}, encoding="utf-8")
-        return df
-    except Exception:
-        pass
+        meibo = pd.read_csv("meibo_1.csv", encoding="cp932")
+    except:
+        st.error("名簿ファイル（meibo_1.csv）を読み込めませんでした。文字コードを UTF-8 または Shift-JIS にしてください。")
+        st.stop()
 
-    # ② cp932（Shift-JIS）で読み込みを試す
-    try:
-        df = pd.read_csv(file, dtype={"id": str}, encoding="cp932")
-        return df
-    except Exception:
-        pass
+# 学籍番号入力
+student_id = st.text_input("学籍番号を入力してください")
 
-    st.error("名簿ファイル（meibo_1.csv）を読み込めませんでした。文字コードを UTF-8 または Shift-JIS にしてください。")
-    return pd.DataFrame(columns=["id", "name"])
-
-df = load_data()
-
-# 入力欄
-student_id = st.text_input("学籍番号を入力してください", max_chars=10)
-
-# 出席記録ファイルのパス
-ATTEND_FILE = "attendance.csv"
-
-# 出席ボタンと処理
 if student_id:
-    hit = df[df["id"] == student_id]
-    if len(hit) == 1:
-        name = hit.iloc[0]["name"]
-        st.success(f"あなたの名前：**{name}** さん")
+    # 名簿から名前を検索
+    row = meibo[meibo["id"].astype(str) == str(student_id)]
 
-        if st.button("出席する"):
-            now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            # 出席を追記（cp932 で保存）
-            with open(ATTEND_FILE, "a", encoding="cp932") as f:
-                f.write(f"{student_id},{name},{now}\n")
-            st.info("出席を記録しました。画面を閉じてかまいません。")
+    if len(row) == 0:
+        st.error("この学籍番号は名簿に存在しません。")
     else:
-        st.error("学籍番号が名簿に見つかりません。もう一度確認してください。")
+        student_name = row.iloc[0]["name"]
+        st.success(f"{student_name} さんですね。出席ボタンを押してください。")
+
+        # 出席ボタン
+        if st.button("出席する"):
+
+            # --- attendance.csv を読み込み（なければ作成） ---
+            try:
+                df = pd.read_csv("attendance.csv", encoding="utf-8")
+            except:
+                df = pd.DataFrame(columns=["id", "name", "time"])
+
+            # --- 二重出席の防止 ---
+            if str(student_id) in df["id"].astype(str).values:
+                st.warning("この学籍番号はすでに出席済みです。")
+            else:
+                # 新しい出席データを追加
+                new_row = pd.DataFrame({
+                    "id": [student_id],
+                    "name": [student_name],
+                    "time": [datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+                })
+
+                df = pd.concat([df, new_row], ignore_index=True)
+
+                # 保存
+                df.to_csv("attendance.csv", index=False, encoding="utf-8")
+
+                st.success("出席を記録しました。")
