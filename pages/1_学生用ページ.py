@@ -50,6 +50,6 @@ if student_id:
                 df = pd.concat([df, new_row], ignore_index=True)
 
                 # 保存
-                df.to_csv("attendance.csv", index=False, encoding="utf-8")
+                df.to_csv("attendance.csv", index=False, encoding="utf-8-sig")
 
                 st.success("出席を記録しました。")
