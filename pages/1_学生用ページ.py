@@ -18,7 +18,6 @@ except:
 student_id = st.text_input("学籍番号を入力してください")
 
 if student_id:
-    # 名簿から名前を検索
     row = meibo[meibo["id"].astype(str) == str(student_id)]
 
     if len(row) == 0:
@@ -27,20 +26,24 @@ if student_id:
         student_name = row.iloc[0]["name"]
         st.success(f"{student_name} さんですね。出席ボタンを押してください。")
 
-        # 出席ボタン
         if st.button("出席する"):
 
-            # --- attendance.csv を読み込み（なければ作成） ---
+            # attendance.csv 読み込み
             try:
-                df = pd.read_csv("attendance.csv", encoding="utf-8")
+                df = pd.read_csv("attendance.csv", encoding="utf-8-sig")
             except:
                 df = pd.DataFrame(columns=["id", "name", "time"])
 
-            # --- 二重出席の防止 ---
-            if str(student_id) in df["id"].astype(str).values:
-                st.warning("この学籍番号はすでに出席済みです。")
+            # 今日の日付
+            today = datetime.date.today().isoformat()
+
+            # 今日の出席だけ抽出
+            df_today = df[df["time"].str.startswith(today)]
+
+            # 二重出席の防止（今日のみ）
+            if str(student_id) in df_today["id"].astype(str).values:
+                st.warning("今日はすでに出席済みです。")
             else:
-                # 新しい出席データを追加
                 new_row = pd.DataFrame({
                     "id": [student_id],
                     "name": [student_name],
@@ -49,7 +52,7 @@ if student_id:
 
                 df = pd.concat([df, new_row], ignore_index=True)
 
-                # 保存
+                # 保存（文字化けしない）
                 df.to_csv("attendance.csv", index=False, encoding="utf-8-sig")
 
                 st.success("出席を記録しました。")
